@@ -1,0 +1,47 @@
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+
+analytics:
+  reporting_enabled: false
+
+common:
+  path_prefix: /loki
+  ring:
+    kvstore:
+      store: inmemory
+  replication_factor: 1
+
+schema_config:
+  configs:
+    - from: "2026-01-01"
+      store: tsdb
+      object_store: s3
+      schema: v13
+      index:
+        prefix: loki_index_
+        period: 24h
+
+storage_config:
+  aws:
+    bucketnames: loki
+    endpoint: minio:9000
+    access_key_id: 'Co1Ap^$A1vAeFG5gXdXpXPzlcai3$d6@z3gi&goX@74iu$XcI27VY7d0J4mvortu'
+    secret_access_key: 'AsgXxG5&07141PUz5X7i29@TLXx2*MDm0@bH8&PZOS8hCUPc6LSg^eekLJe6yTeP'
+    s3forcepathstyle: true
+    insecure: true
+  tsdb_shipper:
+    active_index_directory: /loki/tsdb-index
+    cache_location: /loki/tsdb-cache
+
+compactor:
+  working_directory: /loki/compactor
+  retention_enabled: true
+  compaction_interval: 10m
+  delete_request_store: s3
+
+limits_config:
+  retention_period: 90d
+  allow_structured_metadata: true
+  volume_enabled: true

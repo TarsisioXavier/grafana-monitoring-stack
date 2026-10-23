@@ -1,0 +1,108 @@
+logging {
+  level = "info"
+  format = "logfmt"
+}
+
+prometheus.exporter.cadvisor "docker" {
+  docker_host = "unix:///var/run/docker.sock"
+
+  storage_duration = "5m"
+  store_container_labels = true
+}
+
+prometheus.exporter.unix "host" {
+  procfs_path = "/host/proc"
+  sysfs_path  = "/sys"
+  rootfs_path = "/rootfs"
+}
+
+prometheus.exporter.process "programs" {
+  procfs_path = "/host/proc"
+
+  matcher {
+    cmdline = [".*"]
+  }
+}
+
+prometheus.scrape "docker" {
+  forward_to = [prometheus.relabel.default.receiver]
+  targets = prometheus.exporter.cadvisor.docker.targets
+  scrape_interval = "15s"
+}
+
+prometheus.scrape "host" {
+  forward_to = [prometheus.relabel.default.receiver]
+  targets = prometheus.exporter.unix.host.targets
+  scrape_interval = "15s"
+}
+
+prometheus.scrape "process" {
+  forward_to = [prometheus.relabel.default.receiver]
+  targets = prometheus.exporter.process.programs.targets
+  scrape_interval = "15s"
+}
+
+prometheus.relabel "default" {
+  forward_to = [prometheus.remote_write.default.receiver]
+
+  rule {
+    source_labels = ["name"]
+    target_label  = "container"
+  }
+}
+
+prometheus.remote_write "default" {
+  external_labels = {
+    "hostname" = "localhost",
+    "environment" = "local",
+  }
+
+  endpoint {
+      url = "http://prometheus:9090/api/v1/write"
+  }
+}
+
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "docker_logs" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    target_label = "instance"
+    replacement  = "127.0.0.1"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    target_label = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_product"]
+    target_label = "product"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_service"]
+    target_label = "service"
+  }
+}
+
+loki.source.docker "docker" {
+  forward_to = [loki.process.map_levels.receiver]
+  targets = discovery.relabel.docker_logs.output
+  host = "unix:///var/run/docker.sock"
+}
+
+loki.write "default" {
+  external_labels = {
+    "hostname" = "localhost",
+    "environment" = "local",
+  }
+
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

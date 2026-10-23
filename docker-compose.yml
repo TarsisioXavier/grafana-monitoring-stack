@@ -1,0 +1,94 @@
+networks:
+  monitoring:
+    name: monitoring
+    driver: bridge
+
+services:
+  rustfs:
+    container_name: rustfs
+    build:
+      context: .
+      dockerfile: ./rustfs/Dockerfile
+    environment:
+      RUSTFS_ACCESS_KEY: default
+      RUSTFS_SECRET_KEY: secret
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_CONSOLE_ENABLE: "true"
+    volumes:
+      - ./rustfs/data:/data
+    command: /data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - monitoring
+
+  loki:
+    container_name: loki
+    build:
+      context: .
+      dockerfile: ./loki/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./loki/data:/loki
+      - ./loki/config.yaml:/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+    networks:
+      - monitoring
+
+  grafana:
+    container_name: grafana
+    build:
+      context: ./
+      dockerfile: ./grafana/Dockerfile
+    restart: unless-stopped
+    environment:
+      GF_USERS_VIEWERS_CAN_EDIT: "true"
+    volumes:
+      - ./grafana/data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - monitoring
+
+  prometheus:
+    container_name: prometheus
+    build:
+      context: ./
+      dockerfile: ./prometheus/Dockerfile
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-remote-write-receiver
+    volumes:
+      - ./prometheus/data:/prometheus
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring
+
+  alloy:
+    container_name: alloy
+    build:
+      context: .
+      dockerfile: grafana-alloy/Dockerfile
+    restart: unless-stopped
+    privileged: true
+    security_opt:
+      - apparmor:unconfined
+    command: ["run", "--server.http.listen-addr=0.0.0.0:3200", "--storage.path=/var/lib/alloy/data", "/etc/alloy/config.alloy"]
+    ports:
+      - "3200:3200"
+    volumes:
+      - ./grafana-alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /:/rootfs:ro
+      - /dev/disk:/dev/disk:ro
+      - /proc:/host/proc:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /var/run:/var/run:rw
+    networks:
+      - monitoring
