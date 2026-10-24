@@ -1,3 +1,13 @@
+volumes:
+  rustfs_data:
+    driver: local
+  loki_data:
+    driver: local
+  grafana_data:
+    driver: local
+  prometheus_data:
+    driver: local
+
 networks:
   monitoring:
     name: monitoring
@@ -16,7 +26,7 @@ services:
       RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
       RUSTFS_CONSOLE_ENABLE: "true"
     volumes:
-      - ./rustfs/data:/data
+      - rustfs_data:/data
     command: /data
     ports:
       - "9000:9000"
@@ -31,25 +41,10 @@ services:
       dockerfile: ./loki/Dockerfile
     restart: unless-stopped
     volumes:
-      - ./loki/data:/loki
+      - loki_data:/loki
       - ./loki/config.yaml:/etc/loki/local-config.yaml
     ports:
       - "3100:3100"
-    networks:
-      - monitoring
-
-  grafana:
-    container_name: grafana
-    build:
-      context: ./
-      dockerfile: ./grafana/Dockerfile
-    restart: unless-stopped
-    environment:
-      GF_USERS_VIEWERS_CAN_EDIT: "true"
-    volumes:
-      - ./grafana/data:/var/lib/grafana
-    ports:
-      - "3000:3000"
     networks:
       - monitoring
 
@@ -63,10 +58,25 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
       - --web.enable-remote-write-receiver
     volumes:
-      - ./prometheus/data:/prometheus
+      - prometheus_data:/prometheus
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
+    networks:
+      - monitoring
+
+  grafana:
+    container_name: grafana
+    build:
+      context: ./
+      dockerfile: ./grafana/Dockerfile
+    restart: unless-stopped
+    environment:
+      GF_USERS_VIEWERS_CAN_EDIT: "true"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
     networks:
       - monitoring
 

@@ -91,7 +91,7 @@ discovery.relabel "docker_logs" {
 }
 
 loki.source.docker "docker" {
-  forward_to = [loki.process.map_levels.receiver]
+  forward_to = [loki.write.default.receiver]
   targets = discovery.relabel.docker_logs.output
   host = "unix:///var/run/docker.sock"
 }
